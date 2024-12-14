@@ -235,10 +235,10 @@ app.delete('/delete_user/:id', async (req, res) => {
 // Add menu item endpoint
 app.post('/add_menu_item', async (req, res) => {
     try {
-        const { name, price, category, nutritional_info, customization_options, image_url, description } = req.body;
+        const { name, price, category, nutritional_info, custumization_options, image_url, description } = req.body;
         const result = await pool.query(
-            'INSERT INTO "MenuItems" (name, price, category, nutritional_info, customization_options, image_url, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-            [name, price, category, nutritional_info, customization_options, image_url, description]
+            'INSERT INTO "MenuItems" (name, price, category, nutritional_info, custumization_options, image_url, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [name, price, category, nutritional_info, custumization_options, image_url, description]
         );
         res.json(result.rows[0]);
     } catch (err) {
