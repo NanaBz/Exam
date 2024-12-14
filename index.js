@@ -246,6 +246,26 @@ app.post('/add_menu_item', async (req, res) => {
     }
 });
 
+app.put('/update_menu_item/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, price, category, nutritional_info, custumization_options, image_url, description } = req.body;
+        
+        const result = await pool.query(
+            'UPDATE "MenuItems" SET name = $1, price = $2, category = $3, nutritional_info = $4, custumization_options = $5, image_url = $6, description = $7 WHERE id = $8 RETURNING *',
+            [name, price, category, nutritional_info, custumization_options, image_url, description, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Menu item not found' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
