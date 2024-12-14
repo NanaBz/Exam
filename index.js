@@ -282,6 +282,37 @@ app.delete('/delete_menu_item/:id', async (req, res) => {
     }
 });
 
+// Get order details by ID
+app.get('/get_order_details/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const orderQuery = await pool.query(
+            'SELECT * FROM orders WHERE id = $1',
+            [id]
+        );
+
+        if (orderQuery.rows.length === 0) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const order = orderQuery.rows[0];
+
+        // Get order items
+        const itemsQuery = await pool.query(
+            'SELECT * FROM order_items WHERE order_id = $1',
+            [id]
+        );
+
+        // Combine order with its items
+        order.items = itemsQuery.rows;
+
+        res.json(order);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to get order details' });
+    }
+});
+
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
