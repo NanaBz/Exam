@@ -324,30 +324,40 @@ app.post('/create_order', async (req, res) => {
             user_id,
             items,
             total_price,
-            status,
-            points_earned,
-            points_used,
-            discount_applied
+            status = 'pending',
+            loyalty_points = 0,
+            points_used = 0,
+            discount_applied = 0.00
         } = req.body;
 
-        // Insert the order
+        // Insert the order with new columns
         const orderResult = await client.query(
-            `INSERT INTO "orders" 
-            (user_id, total_price, status, points_earned, points_used, discount_applied, created_at) 
+            `INSERT INTO "Orders" 
+            (user_id, total_price, status, loyalty_points, points_used, discount_applied, created_at) 
             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) 
             RETURNING *`,
-            [user_id, total_price, status, points_earned, points_used, discount_applied]
+            [user_id, total_price, status, loyalty_points, points_used, discount_applied]
         );
 
         const order = orderResult.rows[0];
 
-        // Insert order items - Updated table name to "OrderItems"
+        // Insert order items
         for (let item of items) {
             await client.query(
                 `INSERT INTO "OrderItems" 
                 (order_id, name, price, quantity, customizations) 
                 VALUES ($1, $2, $3, $4, $5)`,
                 [order.id, item.name, item.price, item.quantity, item.customizations]
+            );
+        }
+
+        // Update user's loyalty points if points were used
+        if (points_used > 0) {
+            await client.query(
+                `UPDATE "users" 
+                SET loyalty_points = loyalty_points - $1 
+                WHERE id = $2`,
+                [points_used, user_id]
             );
         }
 
