@@ -297,9 +297,9 @@ app.get('/get_order_details/:id', async (req, res) => {
 
         const order = orderQuery.rows[0];
 
-        // Get order items
+        // Get order items - Updated table name to "OrderItems"
         const itemsQuery = await pool.query(
-            'SELECT * FROM order_items WHERE order_id = $1',
+            'SELECT * FROM "OrderItems" WHERE order_id = $1',
             [id]
         );
 
