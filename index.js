@@ -313,6 +313,62 @@ app.get('/get_order_details/:id', async (req, res) => {
     }
 });
 
+// Create new order
+app.post('/create_order', async (req, res) => {
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        const {
+            user_id,
+            items,
+            total_price,
+            status,
+            points_earned,
+            points_used,
+            discount_applied
+        } = req.body;
+
+        // Insert the order
+        const orderResult = await client.query(
+            `INSERT INTO "orders" 
+            (user_id, total_price, status, points_earned, points_used, discount_applied, created_at) 
+            VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) 
+            RETURNING *`,
+            [user_id, total_price, status, points_earned, points_used, discount_applied]
+        );
+
+        const order = orderResult.rows[0];
+
+        // Insert order items - Updated table name to "OrderItems"
+        for (let item of items) {
+            await client.query(
+                `INSERT INTO "OrderItems" 
+                (order_id, name, price, quantity, customizations) 
+                VALUES ($1, $2, $3, $4, $5)`,
+                [order.id, item.name, item.price, item.quantity, item.customizations]
+            );
+        }
+
+        await client.query('COMMIT');
+        
+        res.status(201).json({
+            message: 'Order created successfully',
+            order: {
+                ...order,
+                items
+            }
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error creating order:', err);
+        res.status(500).json({ error: 'Failed to create order' });
+    } finally {
+        client.release();
+    }
+});
+
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
