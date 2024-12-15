@@ -320,15 +320,23 @@ app.post('/create_order', async (req, res) => {
     try {
         await client.query('BEGIN');
         
+        // Log the entire request body
+        console.log('Complete request body:', req.body);
+        
         const {
             user_id,
             items,
             total_price,
-            status,
-            loyalty_points,
-            points_used,
-            discount_applied
+            status = 'pending',  // Add default value
+            loyalty_points = 0,  // Add default value
+            points_used = 0,     // Add default value
+            discount_applied = 0  // Add default value
         } = req.body;
+
+        // Validate required fields
+        if (!user_id || !items || !total_price) {
+            throw new Error('Missing required fields: user_id, items, or total_price');
+        }
 
         console.log('Received order data:', {
             user_id,
@@ -337,7 +345,7 @@ app.post('/create_order', async (req, res) => {
             loyalty_points,
             points_used,
             discount_applied,
-            items_count: items.length
+            items_count: items?.length || 0
         });
 
         // Insert the order
@@ -360,7 +368,7 @@ app.post('/create_order', async (req, res) => {
                 `INSERT INTO public."OrderItems" 
                 (order_id, name, price, quantity, customizations) 
                 VALUES ($1, $2, $3, $4, $5)`,
-                [order.id, item.name, item.price, item.quantity, item.customizations]
+                [order.id, item.name, item.price, item.quantity, item.customizations || {}]
             );
         }
 
@@ -378,11 +386,13 @@ app.post('/create_order', async (req, res) => {
         console.error('Detailed error creating order:', {
             error: err,
             message: err.message,
-            stack: err.stack
+            stack: err.stack,
+            requestBody: req.body
         });
         res.status(500).json({ 
             error: 'Failed to create order',
-            details: err.message 
+            details: err.message,
+            requestBody: req.body
         });
     } finally {
         client.release();
