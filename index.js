@@ -7,7 +7,13 @@ const jwt = require('jsonwebtoken');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: [
+        'https://feastflow-frontend.onrender.com',
+        'http://localhost:3000'  // Keep this for local development
+    ],
+    credentials: true
+}));
 app.use(express.json());
 
 // Database configuration
@@ -79,7 +85,8 @@ app.get('/user_info/:id', async (req, res) => {
         }
         res.json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Error fetching user info:', err);
+        res.status(500).json({ error: 'Failed to fetch user info' });
     }
 });
 
@@ -125,7 +132,8 @@ app.get('/menu_items', async (req, res) => {
         const result = await pool.query('SELECT * FROM "MenuItems"');
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Error fetching menu items:', err);
+        res.status(500).json({ error: 'Failed to fetch menu items' });
     }
 });
 
@@ -447,6 +455,22 @@ app.get('/get_user_orders/:userId', async (req, res) => {
         console.error('Error getting user orders:', err);
         res.status(500).json({ error: 'Failed to get user orders' });
     }
+});
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Server Error:', err);
+    res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
+
+// Add logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
 });
 
 const port = process.env.PORT || 5000;
