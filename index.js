@@ -97,6 +97,28 @@ app.put('/update_user_info', async (req, res) => {
     }
 });
 
+// Update user info
+app.put('/update_user_info/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, email, dietary_restrictions, allergies, loyalty_points } = req.body;
+        
+        const result = await pool.query(
+            'UPDATE "users" SET username = $1, email = $2, dietary_restrictions = $3, allergies = $4, loyalty_points = $5 WHERE id = $6 RETURNING *',
+            [username, email, dietary_restrictions, allergies, loyalty_points, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error updating user info:', err);
+        res.status(500).json({ error: 'Failed to update user info' });
+    }
+});
+
 // MENU ENDPOINTS
 app.get('/menu_items', async (req, res) => {
     try {
