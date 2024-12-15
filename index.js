@@ -324,40 +324,43 @@ app.post('/create_order', async (req, res) => {
             user_id,
             items,
             total_price,
-            status = 'pending',
-            loyalty_points = 0,
-            points_used = 0,
-            discount_applied = 0.00
+            status,
+            loyalty_points,
+            points_used,
+            discount_applied
         } = req.body;
 
-        // Insert the order with new columns
+        console.log('Received order data:', {
+            user_id,
+            total_price,
+            status,
+            loyalty_points,
+            points_used,
+            discount_applied,
+            items_count: items.length
+        });
+
+        // Insert the order
         const orderResult = await client.query(
-            `INSERT INTO "Orders" 
+            `INSERT INTO public."Orders" 
             (user_id, total_price, status, loyalty_points, points_used, discount_applied, created_at) 
             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP) 
             RETURNING *`,
             [user_id, total_price, status, loyalty_points, points_used, discount_applied]
         );
 
+        console.log('Order inserted:', orderResult.rows[0]);
+
         const order = orderResult.rows[0];
 
         // Insert order items
         for (let item of items) {
+            console.log('Inserting item:', item);
             await client.query(
-                `INSERT INTO "OrderItems" 
+                `INSERT INTO public."OrderItems" 
                 (order_id, name, price, quantity, customizations) 
                 VALUES ($1, $2, $3, $4, $5)`,
                 [order.id, item.name, item.price, item.quantity, item.customizations]
-            );
-        }
-
-        // Update user's loyalty points if points were used
-        if (points_used > 0) {
-            await client.query(
-                `UPDATE "users" 
-                SET loyalty_points = loyalty_points - $1 
-                WHERE id = $2`,
-                [points_used, user_id]
             );
         }
 
@@ -372,8 +375,15 @@ app.post('/create_order', async (req, res) => {
         });
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Error creating order:', err);
-        res.status(500).json({ error: 'Failed to create order' });
+        console.error('Detailed error creating order:', {
+            error: err,
+            message: err.message,
+            stack: err.stack
+        });
+        res.status(500).json({ 
+            error: 'Failed to create order',
+            details: err.message 
+        });
     } finally {
         client.release();
     }
