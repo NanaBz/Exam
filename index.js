@@ -421,6 +421,34 @@ app.post('/create_order', async (req, res) => {
     }
 });
 
+// Get orders by user ID
+app.get('/get_user_orders/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const result = await pool.query(
+            'SELECT * FROM "Orders" WHERE user_id = $1 ORDER BY created_at DESC',
+            [userId]
+        );
+
+        // Get order items for each order
+        const orders = await Promise.all(result.rows.map(async (order) => {
+            const itemsResult = await pool.query(
+                'SELECT * FROM "OrderItems" WHERE order_id = $1',
+                [order.id]
+            );
+            return {
+                ...order,
+                items: itemsResult.rows
+            };
+        }));
+
+        res.json(orders);
+    } catch (err) {
+        console.error('Error getting user orders:', err);
+        res.status(500).json({ error: 'Failed to get user orders' });
+    }
+});
+
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
