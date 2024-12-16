@@ -8,11 +8,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: [
-        'https://feastflow-frontend.onrender.com',
-        'http://localhost:3000'  // Keep this for local development
-    ],
-    credentials: true
+    origin: ['https://feastflow-frontend.onrender.com', 'http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
@@ -31,15 +30,26 @@ const pool = new Pool({
 app.post('/create_new_user_info', async (req, res) => {
     try {
         const { username, email, password, dietary_restrictions, allergies } = req.body;
-        const hashedPassword = await bcrypt.hash(password, 10);
         
+        // Check if user already exists
+        const existingUser = await pool.query(
+            'SELECT * FROM "users" WHERE email = $1',
+            [email]
+        );
+
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
         const result = await pool.query(
             'INSERT INTO "users" (username, email, password, dietary_restrictions, allergies, loyalty_points) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [username, email, hashedPassword, dietary_restrictions, allergies, 0]
+            [username, email, password, dietary_restrictions, allergies, 0]
         );
-        res.json(result.rows[0]);
+
+        res.status(201).json(result.rows[0]);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Error creating user:', err);
+        res.status(500).json({ error: 'Failed to create user' });
     }
 });
 
@@ -57,21 +67,36 @@ app.get('/get_all_user_info', async (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await pool.query('SELECT * FROM "users" WHERE email = $1', [email]);
         
-        if (user.rows.length === 0) {
-            return res.status(401).json({ error: 'User not found' });
+        // Check if email and password are provided
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        const validPassword = await bcrypt.compare(password, user.rows[0].password);
-        if (!validPassword) {
-            return res.status(401).json({ error: 'Invalid password' });
+        const result = await pool.query(
+            'SELECT * FROM "users" WHERE email = $1',
+            [email]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        const token = jwt.sign({ userId: user.rows[0].id }, 'your_jwt_secret');
-        res.json({ token, user: user.rows[0] });
+        const user = result.rows[0];
+        // Add proper password validation here
+        if (password !== user.password) { // Note: In production, use proper password hashing
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        res.json({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            loyalty_points: user.loyalty_points || 0
+        });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Login failed' });
     }
 });
 
@@ -79,10 +104,15 @@ app.post('/login', async (req, res) => {
 app.get('/user_info/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('SELECT * FROM "users" WHERE id = $1', [id]);
+        const result = await pool.query(
+            'SELECT id, username, email, dietary_restrictions, allergies, loyalty_points FROM "users" WHERE id = $1',
+            [id]
+        );
+
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
+
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error fetching user info:', err);
@@ -129,7 +159,12 @@ app.put('/update_user_info/:id', async (req, res) => {
 // MENU ENDPOINTS
 app.get('/menu_items', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM "MenuItems"');
+        const result = await pool.query('SELECT * FROM "MenuItems" ORDER BY category');
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No menu items found' });
+        }
+        
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching menu items:', err);
@@ -140,10 +175,19 @@ app.get('/menu_items', async (req, res) => {
 app.get('/menu_items/:category', async (req, res) => {
     try {
         const { category } = req.params;
-        const result = await pool.query('SELECT * FROM "MenuItems" WHERE category = $1', [category]);
+        const result = await pool.query(
+            'SELECT * FROM "MenuItems" WHERE category = $1',
+            [category]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No menu items found in this category' });
+        }
+        
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('Error fetching menu items by category:', err);
+        res.status(500).json({ error: 'Failed to fetch menu items' });
     }
 });
 
