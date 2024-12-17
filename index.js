@@ -8,7 +8,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: ['https://feastflow-frontend.onrender.com', 'http://localhost:3000'],
+    origin: [
+        'https://nanabz.github.io',
+        'http://localhost:3000'  // Keep this for local development
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
